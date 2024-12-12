@@ -44,3 +44,30 @@ jobs:
         with:
           name: html-coverage-report
           path: coverage.html
+
+      - name: Comment on PR with the coverage report link
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const coveragePath = './coverage.html';
+            const coverageContent = fs.readFileSync(coveragePath, 'utf8');
+            const encodedContent = Buffer.from(coverageContent).toString('base64');
+
+            github.rest.repos.createOrUpdateFileContents({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              path: `pr-coverage/${context.payload.pull_request.number}/coverage.html`,
+              message: `Add coverage report for PR #${context.payload.pull_request.number}`,
+              content: encodedContent,
+              branch: context.payload.pull_request.head.ref,
+            });
+
+            const coverageUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/blob/${context.payload.pull_request.head.ref}/pr-coverage/${context.payload.pull_request.number}/coverage.html`;
+            github.rest.issues.createComment({
+              issue_number: context.payload.pull_request.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `Code Coverage Report:\n\n[View Coverage Report](${coverageUrl})`,
+            });
