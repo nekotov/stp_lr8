@@ -4,16 +4,18 @@ on:
   push:
     branches:
       - main
-  pull_request: 
+  pull_request:
     branches:
-      - '**' 
+      - '**'
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
 
     steps:
-      
       - name: Checkout code
         uses: actions/checkout@v3
 
@@ -30,19 +32,13 @@ jobs:
           go test -v -coverprofile=coverage.out
           go tool cover -func=coverage.out
 
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v3
-        with:
-          name: coverage-report
-          path: coverage.out
-
       - name: Generate HTML coverage report
         run: go tool cover -html=coverage.out -o coverage.html
 
-      - name: Upload HTML coverage report
+      - name: Upload coverage report
         uses: actions/upload-artifact@v3
         with:
-          name: html-coverage-report
+          name: coverage-html
           path: coverage.html
 
       - name: Comment on PR with the coverage report link
