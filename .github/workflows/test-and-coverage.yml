@@ -1,0 +1,69 @@
+name: Go Test and Coverage
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.22.5
+
+      - name: Install dependencies
+        run: go mod tidy
+
+      - name: Run tests and generate coverage report
+        run: |
+          go test -v -coverprofile=coverage.out
+          go tool cover -func=coverage.out
+
+      - name: Generate HTML coverage report
+        run: go tool cover -html=coverage.out -o coverage.html
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-html
+          path: coverage.html
+
+      - name: Comment on PR with the coverage report link
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const coveragePath = './coverage.html';
+            const coverageContent = fs.readFileSync(coveragePath, 'utf8');
+            const encodedContent = Buffer.from(coverageContent).toString('base64');
+
+            github.rest.repos.createOrUpdateFileContents({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              path: `pr-coverage/${context.payload.pull_request.number}/coverage.html`,
+              message: `Add coverage report for PR #${context.payload.pull_request.number}`,
+              content: encodedContent,
+              branch: context.payload.pull_request.head.ref,
+            });
+
+            const coverageUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/blob/${context.payload.pull_request.head.ref}/pr-coverage/${context.payload.pull_request.number}/coverage.html`;
+            github.rest.issues.createComment({
+              issue_number: context.payload.pull_request.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `Code Coverage Report:\n\n[View Coverage Report](${coverageUrl})`,
+            });
